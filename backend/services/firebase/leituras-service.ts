@@ -1,35 +1,37 @@
-
 import {
-  collection,
-  getDocs,
-  doc,
-  getDoc,
-  setDoc,
+  child,
+  equalTo,
+  get,
+  onValue,
+  orderByChild,
   query,
-  where,
-  orderBy,
-} from "firebase/firestore";
+  ref,
+  set,
+} from "firebase/database";
 
-import { db, auth } from "../firebase";
 import type { Leitura } from "../../../src/data/leituras";
+import { auth, realtimeDb } from "../firebase";
 
-// Retorna a coleção de leituras do usuário conectado
-function obterColecaoLeituras() {
+// Retorna o caminho das leituras do usuário conectado
+function obterReferenciaLeituras() {
   const usuario = auth.currentUser;
 
   if (!usuario) {
     throw new Error("Nenhum usuário está conectado.");
   }
 
-  return collection(db, "usuarios", usuario.uid, "leituras");
+  return ref(realtimeDb, `usuarios/${usuario.uid}/leituras`);
 }
 
-// Salva uma medição no Firestore
+// Salva uma medição no Realtime Database
 export async function salvarLeituraFirestore(
   leitura: Leitura,
 ): Promise<void> {
   try {
-    await setDoc(doc(obterColecaoLeituras(), leitura.id), leitura);
+    await set(
+      child(obterReferenciaLeituras(), leitura.id),
+      leitura
+    );
   } catch (erro) {
     console.error("Erro ao salvar medição:", erro);
     throw erro;
@@ -39,12 +41,18 @@ export async function salvarLeituraFirestore(
 // Busca todas as medições do usuário
 export async function buscarLeiturasFirestore(): Promise<Leitura[]> {
   try {
-    const resultado = await getDocs(obterColecaoLeituras());
+    const resultado = await get(obterReferenciaLeituras());
 
-    return resultado.docs.map((documento) => ({
-      ...documento.data(),
-      id: documento.id,
-    })) as Leitura[];
+    if (!resultado.exists()) {
+      return [];
+    }
+
+    const dados = resultado.val();
+
+    return Object.entries(dados).map(([id, leitura]) => ({
+      ...(leitura as Leitura),
+      id,
+    }));
   } catch (erro) {
     console.error("Erro ao buscar medições:", erro);
     throw erro;
@@ -57,17 +65,25 @@ export async function buscarLeiturasPorPontoFirestore(
 ): Promise<Leitura[]> {
   try {
     const consulta = query(
-      obterColecaoLeituras(),
-      where("pontoId", "==", pontoId),
-      orderBy("dataHora", "desc"),
+      obterReferenciaLeituras(),
+      orderByChild("pontoId"),
+      equalTo(pontoId),
     );
 
-    const resultado = await getDocs(consulta);
+    const resultado = await get(consulta);
 
-    return resultado.docs.map((documento) => ({
-      ...documento.data(),
-      id: documento.id,
-    })) as Leitura[];
+    if (!resultado.exists()) {
+      return [];
+    }
+
+    const dados = resultado.val();
+
+    return Object.entries(dados)
+      .map(([id, leitura]) => ({
+        ...(leitura as Leitura),
+        id,
+      }))
+      .sort((a, b) => b.dataHora.localeCompare(a.dataHora));
   } catch (erro) {
     console.error("Erro ao buscar medições do ponto:", erro);
     throw erro;
@@ -79,19 +95,64 @@ export async function buscarLeituraPorIdFirestore(
   id: string,
 ): Promise<Leitura | null> {
   try {
-    const referencia = doc(obterColecaoLeituras(), id);
-    const resultado = await getDoc(referencia);
+    const referencia = child(obterReferenciaLeituras(), id);
+    const resultado = await get(referencia);
 
     if (!resultado.exists()) {
       return null;
     }
 
     return {
-      ...resultado.data(),
-      id: resultado.id,
+      ...resultado.val(),
+      id,
     } as Leitura;
   } catch (erro) {
     console.error("Erro ao buscar medição:", erro);
     throw erro;
   }
 }
+
+
+// Acompanha as medições do produtor em tempo real
+export function observarLeituras(
+  aoAtualizar: (leituras: Leitura[]) => void,
+  aoErro?: (erro: Error) => void,
+): () => void {
+  try {
+    const referencia = obterReferenciaLeituras();
+
+    const cancelar = onValue(
+      referencia,
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          aoAtualizar([]);
+          return;
+        }
+
+        const dados = snapshot.val();
+
+        const leituras = Object.entries(dados)
+          .map(([id, leitura]) => ({
+            ...(leitura as Leitura),
+            id,
+          }))
+          .sort((a, b) => b.dataHora.localeCompare(a.dataHora));
+
+        aoAtualizar(leituras);
+      },
+      (erro) => {
+        console.error("Erro ao acompanhar medições:", erro);
+        aoErro?.(erro);
+      },
+    );
+
+    return cancelar;
+  } catch (erro) {
+    if (erro instanceof Error) {
+      aoErro?.(erro);
+    }
+
+    return () => {};
+  }
+}
+
