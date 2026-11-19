@@ -13,6 +13,7 @@ import type { Ponto } from "../services/pontos-storage";
 
 import { buscarPontosFirestore } from "../../backend/services/firebase/pontos-service";
 import { buscarLeiturasPorPontoFirestore } from "../../backend/services/firebase/leituras-service";
+
 type PontoComLeituras = {
   ponto: Ponto;
   quantidade: number;
@@ -98,37 +99,60 @@ export default function AreaDetalhesScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <TouchableOpacity
           style={styles.botaoVoltar}
-          onPress={() => router.push("/areas")}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace("/areas")
+          }
         >
           <Text style={styles.seta}>←</Text>
           <Text style={styles.textoVoltar}>Áreas</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Área {area}</Text>
-
-        <Text style={styles.subtitle}>
-          Consulte os pontos que já possuem medições recebidas.
-        </Text>
+        <View style={styles.cabecalho}>
+          <Text style={styles.miniTitulo}>AGROSENSE</Text>
+          <Text style={styles.title}>Área {area}</Text>
+          <Text style={styles.subtitle}>
+            Consulte os pontos monitorados e acompanhe as medições recebidas
+            nesta área.
+          </Text>
+        </View>
 
         {!carregando && pontos.length > 0 && (
           <View style={styles.resumoCard}>
-            <Text style={styles.resumoNumero}>{pontos.length}</Text>
-            <Text style={styles.resumoTexto}>
-              {pontos.length === 1
-                ? "Ponto com medição"
-                : "Pontos com medições"}
-            </Text>
+            <View>
+              <Text style={styles.resumoLegenda}>PONTOS COM MEDIÇÃO</Text>
+              <Text style={styles.resumoNumero}>{pontos.length}</Text>
+              <Text style={styles.resumoDescricao}>
+                {pontos.length === 1
+                  ? "ponto com dados recebidos"
+                  : "pontos com dados recebidos"}
+              </Text>
+            </View>
+
+            <View style={styles.resumoLateral}>
+              <Text style={styles.resumoLateralNumero}>
+                {pontos.reduce((total, ponto) => total + ponto.quantidade, 0)}
+              </Text>
+              <Text style={styles.resumoLateralTexto}>medições realizadas</Text>
+            </View>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Pontos monitorados</Text>
+        <View style={styles.secaoTitulo}>
+          <Text style={styles.sectionTitle}>Pontos monitorados</Text>
+          <Text style={styles.sectionSubtitle}>
+            Selecione um ponto para consultar seu histórico.
+          </Text>
+        </View>
 
         {carregando ? (
-          <View style={styles.card}>
+          <View style={styles.estadoCard}>
             <Text style={styles.textoVazio}>Carregando medições...</Text>
           </View>
         ) : pontos.length === 0 ? (
-          <View style={styles.card}>
+          <View style={styles.vazio}>
+            <View style={styles.vazioIcone}>
+              <Text style={styles.vazioIconeTexto}>—</Text>
+            </View>
             <Text style={styles.vazioTitulo}>Nenhuma medição disponível</Text>
             <Text style={styles.textoVazio}>
               Os pontos desta área aparecerão aqui quando receberem suas
@@ -140,6 +164,7 @@ export default function AreaDetalhesScreen() {
             <TouchableOpacity
               key={ponto.id}
               style={styles.pontoCard}
+              activeOpacity={0.75}
               onPress={() =>
                 router.push({
                   pathname: "/ponto-detalhes",
@@ -153,6 +178,8 @@ export default function AreaDetalhesScreen() {
               }
             >
               <View style={styles.pontoCabecalho}>
+                <View style={styles.pontoIndicador} />
+
                 <View style={styles.pontoIdentificacao}>
                   <Text style={styles.pontoNome}>{ponto.nome}</Text>
                   <Text style={styles.pontoId}>{ponto.id}</Text>
@@ -167,18 +194,25 @@ export default function AreaDetalhesScreen() {
 
               <View style={styles.divisor} />
 
-              <Text style={styles.informacao}>
-                Medições recebidas: {quantidade}
-              </Text>
+              <View style={styles.informacoes}>
+                <Text style={styles.informacao}>
+                  Medições recebidas: {quantidade}
+                </Text>
 
-              <Text style={styles.informacao}>
-                Última medição: {formatarData(ultimaLeitura)}
-              </Text>
+                <Text style={styles.informacao}>
+                  Última medição: {formatarData(ultimaLeitura)}
+                </Text>
+              </View>
 
-              <Text style={styles.status}>Dados recebidos</Text>
+              <View style={styles.statusContainer}>
+                <View style={styles.statusIndicador} />
+                <Text style={styles.status}>Dados recebidos</Text>
+              </View>
             </TouchableOpacity>
           ))
         )}
+
+        <Text style={styles.rodape}>AGROSENSE • MONITORAMENTO AGRÍCOLA</Text>
       </ScrollView>
     </View>
   );
@@ -187,132 +221,230 @@ export default function AreaDetalhesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F7F2",
+    backgroundColor: "#F2F5EF",
   },
   content: {
     width: "90%",
-    maxWidth: 700,
+    maxWidth: 850,
     alignSelf: "center",
-    paddingVertical: 25,
+    paddingTop: 25,
+    paddingBottom: 35,
   },
   botaoVoltar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 25,
+    marginBottom: 28,
   },
   seta: {
-    fontSize: 28,
+    fontSize: 25,
     color: "#2F5D3A",
-    marginRight: 8,
+    marginRight: 9,
   },
   textoVoltar: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#2F5D3A",
     fontWeight: "600",
   },
-  title: {
-    fontSize: 28,
+  cabecalho: {
+    marginBottom: 22,
+  },
+  miniTitulo: {
+    fontSize: 11,
     fontWeight: "bold",
-    color: "#2F5D3A",
+    letterSpacing: 2,
+    color: "#779477",
     marginBottom: 8,
   },
+  title: {
+    fontSize: 29,
+    fontWeight: "bold",
+    color: "#244D31",
+    marginBottom: 9,
+  },
   subtitle: {
-    fontSize: 15,
-    color: "#666",
-    marginBottom: 22,
+    fontSize: 14,
+    color: "#687568",
     lineHeight: 22,
+    maxWidth: 560,
   },
   resumoCard: {
-    backgroundColor: "#E7EFE5",
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 25,
+    backgroundColor: "#244D31",
+    borderRadius: 15,
+    padding: 22,
+    marginBottom: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  resumoLegenda: {
+    color: "#D7E5D5",
+    fontSize: 11,
+    fontWeight: "bold",
+    letterSpacing: 1,
   },
   resumoNumero: {
-    fontSize: 28,
+    color: "#FFFFFF",
+    fontSize: 34,
     fontWeight: "bold",
-    color: "#2F5D3A",
+    marginTop: 7,
   },
-  resumoTexto: {
-    fontSize: 14,
-    color: "#526653",
+  resumoDescricao: {
+    color: "#D7E5D5",
+    fontSize: 12,
     marginTop: 3,
+  },
+  resumoLateral: {
+    alignItems: "flex-end",
+    paddingLeft: 12,
+  },
+  resumoLateralNumero: {
+    color: "#FFFFFF",
+    fontSize: 25,
+    fontWeight: "bold",
+  },
+  resumoLateralTexto: {
+    color: "#D7E5D5",
+    fontSize: 11,
+    marginTop: 3,
+  },
+  secaoTitulo: {
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
-    marginBottom: 12,
+    color: "#244D31",
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 10,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+  sectionSubtitle: {
+    fontSize: 13,
+    color: "#788278",
+    marginTop: 4,
   },
   pontoCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 10,
+    borderRadius: 14,
     padding: 18,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#E5EAE2",
   },
   pontoCabecalho: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+  },
+  pontoIndicador: {
+    width: 4,
+    alignSelf: "stretch",
+    borderRadius: 4,
+    backgroundColor: "#A8C69F",
+    marginRight: 13,
   },
   pontoIdentificacao: {
     flex: 1,
   },
   pontoNome: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#2F5D3A",
   },
   pontoId: {
-    fontSize: 12,
-    color: "#888",
-    marginTop: 3,
+    fontSize: 11,
+    color: "#899289",
+    marginTop: 4,
   },
   arrow: {
-    fontSize: 24,
-    color: "#2F5D3A",
+    fontSize: 23,
+    color: "#6E9270",
+    marginLeft: 8,
   },
   pontoDescricao: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 12,
+    fontSize: 13,
+    color: "#687568",
+    marginTop: 13,
+    lineHeight: 20,
   },
   divisor: {
     height: 1,
-    backgroundColor: "#EEEEEE",
-    marginVertical: 13,
+    backgroundColor: "#EDF0EB",
+    marginVertical: 14,
+  },
+  informacoes: {
+    gap: 7,
   },
   informacao: {
-    fontSize: 13,
-    color: "#666",
-    marginBottom: 6,
+    fontSize: 12,
+    color: "#687568",
+    lineHeight: 19,
+  },
+  statusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#EDF4EB",
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginTop: 13,
+  },
+  statusIndicador: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#6E9270",
+    marginRight: 7,
   },
   status: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     color: "#2F5D3A",
-    marginTop: 5,
   },
-  textoVazio: {
-    fontSize: 14,
-    color: "#777",
-    lineHeight: 21,
-    marginTop: 5,
+  estadoCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 25,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5EAE2",
+  },
+  vazio: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 28,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5EAE2",
+  },
+  vazioIcone: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#EDF4EB",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 13,
+  },
+  vazioIconeTexto: {
+    color: "#6E9270",
+    fontSize: 22,
   },
   vazioTitulo: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "bold",
     color: "#2F5D3A",
     marginBottom: 8,
+    textAlign: "center",
+  },
+  textoVazio: {
+    fontSize: 13,
+    color: "#788278",
+    lineHeight: 21,
+    textAlign: "center",
+  },
+  rodape: {
+    textAlign: "center",
+    color: "#9AA49A",
+    fontSize: 10,
+    letterSpacing: 1,
+    marginTop: 30,
   },
 });

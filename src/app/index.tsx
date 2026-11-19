@@ -1,7 +1,22 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { router } from "expo-router";
+import { useEffect } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function HomeScreen() {
+  useEffect(() => {
+    function handleKeyPress(event: KeyboardEvent) {
+      if (event.key === "Enter") {
+        router.push("/login");
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyPress);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyPress);
+    };
+  }, []);
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>

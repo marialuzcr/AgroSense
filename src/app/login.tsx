@@ -1,11 +1,11 @@
 import { useState } from "react";
 import {
+  ActivityIndicator,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from "react-native";
 
 import { router } from "expo-router";
@@ -73,6 +73,7 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
             editable={!carregando}
+            returnKeyType="next"
           />
 
           <Text style={styles.label}>Senha</Text>
@@ -84,6 +85,8 @@ export default function LoginScreen() {
             value={senha}
             onChangeText={setSenha}
             editable={!carregando}
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
           />
 
           {erro !== "" && <Text style={styles.error}>{erro}</Text>}

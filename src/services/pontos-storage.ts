@@ -22,8 +22,7 @@ export async function buscarPontos(): Promise<Ponto[]> {
 
     const pontos = JSON.parse(dados) as Partial<Ponto>[];
 
-    // Pontos cadastrados antes da criação do campo "tipo"
-    // serão considerados fixos.
+    // Pontos cadastrados antes da criação do campo "tipo" serão considerados fixos.
     return pontos.map((ponto) => ({
       ...ponto,
       tipo: ponto.tipo ?? "fixo",

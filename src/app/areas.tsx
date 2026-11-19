@@ -30,6 +30,7 @@ export default function AreasScreen() {
     Record<string, PontoComLeitura[]>
   >({});
   const [carregando, setCarregando] = useState(true);
+  const [areaExpandida, setAreaExpandida] = useState<string | null>(null);
 
   const carregarDados = useCallback(async () => {
     try {
@@ -88,28 +89,60 @@ export default function AreasScreen() {
     (lista) => lista.length > 0,
   );
 
+  const totalPontos = Object.values(pontosPorArea).reduce(
+    (total, lista) => total + lista.length,
+    0,
+  );
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <TouchableOpacity
           style={styles.botaoVoltar}
-          onPress={() => router.push("/dashboard")}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace("/dashboard")
+          }
         >
           <Text style={styles.seta}>←</Text>
           <Text style={styles.textoVoltar}>Dashboard</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Pontos medidos</Text>
+        <View style={styles.cabecalho}>
+          <Text style={styles.miniTitulo}>AGROSENSE</Text>
+          <Text style={styles.title}>Áreas de medição</Text>
+          <Text style={styles.subtitle}>
+            Acompanhe os pontos que já possuem medições registradas na
+            propriedade.
+          </Text>
+        </View>
 
-        <Text style={styles.subtitle}>
-          Consulte os pontos que já possuem medições recebidas.
-        </Text>
+        <View style={styles.resumoCard}>
+          <View>
+            <Text style={styles.resumoLegenda}>PONTOS COM MEDIÇÃO</Text>
+            <Text style={styles.resumoNumero}>
+              {carregando ? "..." : totalPontos}
+            </Text>
+            <Text style={styles.resumoDescricao}>
+              {totalPontos === 1 ? "ponto registrado" : "pontos registrados"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.secaoTitulo}>
+          <Text style={styles.secaoTexto}>Suas áreas</Text>
+          <Text style={styles.secaoSubtexto}>
+            Selecione uma área para visualizar seus pontos
+          </Text>
+        </View>
 
         {carregando ? (
-          <Text style={styles.mensagem}>Carregando dados...</Text>
+          <View style={styles.estadoCard}>
+            <Text style={styles.mensagem}>Carregando dados...</Text>
+          </View>
         ) : (
           areas.map((area) => {
             const pontos = pontosPorArea[area.nome] || [];
+            const expandida = areaExpandida === area.nome;
 
             if (pontos.length === 0) {
               return null;
@@ -117,40 +150,65 @@ export default function AreasScreen() {
 
             return (
               <View key={area.identificacao} style={styles.areaCard}>
-                <Text style={styles.areaName}>{area.nome}</Text>
+                <TouchableOpacity
+                  style={styles.areaCabecalho}
+                  activeOpacity={0.7}
+                  onPress={() => setAreaExpandida(expandida ? null : area.nome)}
+                >
+                  <View>
+                    <Text style={styles.areaIdentificacao}>
+                      {area.identificacao}
+                    </Text>
+                    <Text style={styles.areaName}>{area.nome}</Text>
+                  </View>
 
-                <Text style={styles.quantidade}>
-                  {pontos.length}{" "}
-                  {pontos.length === 1
-                    ? "ponto com medição"
-                    : "pontos com medições"}
-                </Text>
-
-                {pontos.map(({ ponto, ultimaLeitura }) => (
-                  <TouchableOpacity
-                    key={ponto.id}
-                    style={styles.pontoCard}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/area-detalhes",
-                        params: {
-                          area: area.nome,
-                        },
-                      })
-                    }
-                  >
-                    <View style={styles.topoPonto}>
-                      <Text style={styles.nomePonto}>{ponto.nome}</Text>
-                      <Text style={styles.arrow}>→</Text>
+                  <View style={styles.areaDireita}>
+                    <View style={styles.contador}>
+                      <Text style={styles.contadorNumero}>{pontos.length}</Text>
+                      <Text style={styles.contadorTexto}>
+                        {pontos.length === 1 ? "ponto" : "pontos"}
+                      </Text>
                     </View>
 
-                    <Text style={styles.identificacao}>{ponto.id}</Text>
-
-                    <Text style={styles.ultimaLeitura}>
-                      Última medição: {formatarData(ultimaLeitura)}
+                    <Text style={styles.expandirSeta}>
+                      {expandida ? "⌃" : "⌄"}
                     </Text>
-                  </TouchableOpacity>
-                ))}
+                  </View>
+                </TouchableOpacity>
+
+                {expandida && (
+                  <>
+                    <View style={styles.divisor} />
+
+                    {pontos.map(({ ponto, ultimaLeitura }) => (
+                      <TouchableOpacity
+                        key={ponto.id}
+                        style={styles.pontoCard}
+                        activeOpacity={0.75}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/area-detalhes",
+                            params: {
+                              area: area.nome,
+                            },
+                          })
+                        }
+                      >
+                        <View style={styles.pontoIndicador} />
+
+                        <View style={styles.pontoConteudo}>
+                          <Text style={styles.nomePonto}>{ponto.nome}</Text>
+                          <Text style={styles.identificacao}>{ponto.id}</Text>
+                          <Text style={styles.ultimaLeitura}>
+                            Última medição: {formatarData(ultimaLeitura)}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.arrow}>→</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                )}
               </View>
             );
           })
@@ -158,12 +216,18 @@ export default function AreasScreen() {
 
         {!carregando && !possuiMedicoes && (
           <View style={styles.vazio}>
+            <View style={styles.vazioIcone}>
+              <Text style={styles.vazioIconeTexto}>—</Text>
+            </View>
             <Text style={styles.vazioTitulo}>Nenhuma medição disponível</Text>
-            <Text style={styles.mensagem}>
-              As áreas aparecerão aqui quando houver medições recebidas.
+            <Text style={styles.vazioMensagem}>
+              As áreas aparecerão aqui quando houver medições recebidas dos
+              sensores.
             </Text>
           </View>
         )}
+
+        <Text style={styles.rodape}>AGROSENSE • MONITORAMENTO AGRÍCOLA</Text>
       </ScrollView>
     </View>
   );
@@ -172,109 +236,237 @@ export default function AreasScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F7F2",
+    backgroundColor: "#F2F5EF",
   },
   content: {
     width: "90%",
-    maxWidth: 700,
+    maxWidth: 850,
     alignSelf: "center",
-    paddingVertical: 25,
+    paddingTop: 25,
+    paddingBottom: 35,
   },
   botaoVoltar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 25,
+    marginBottom: 28,
   },
   seta: {
-    fontSize: 28,
+    fontSize: 25,
     color: "#2F5D3A",
-    marginRight: 8,
+    marginRight: 9,
   },
   textoVoltar: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#2F5D3A",
     fontWeight: "600",
   },
-  title: {
-    fontSize: 28,
+  cabecalho: {
+    marginBottom: 22,
+  },
+  miniTitulo: {
+    fontSize: 11,
     fontWeight: "bold",
-    color: "#2F5D3A",
+    letterSpacing: 2,
+    color: "#779477",
     marginBottom: 8,
   },
+  title: {
+    fontSize: 29,
+    fontWeight: "bold",
+    color: "#244D31",
+    marginBottom: 9,
+  },
   subtitle: {
-    fontSize: 15,
-    color: "#666",
-    marginBottom: 22,
+    fontSize: 14,
+    color: "#687568",
     lineHeight: 22,
+    maxWidth: 560,
+  },
+  resumoCard: {
+    backgroundColor: "#244D31",
+    borderRadius: 15,
+    padding: 22,
+    marginBottom: 30,
+  },
+  resumoLegenda: {
+    color: "#D7E5D5",
+    fontSize: 11,
+    fontWeight: "bold",
+    letterSpacing: 1,
+  },
+  resumoNumero: {
+    color: "#FFFFFF",
+    fontSize: 34,
+    fontWeight: "bold",
+    marginTop: 7,
+  },
+  resumoDescricao: {
+    color: "#D7E5D5",
+    fontSize: 13,
+    marginTop: 2,
+  },
+  secaoTitulo: {
+    marginBottom: 16,
+  },
+  secaoTexto: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#244D31",
+  },
+  secaoSubtexto: {
+    fontSize: 13,
+    color: "#788278",
+    marginTop: 4,
   },
   areaCard: {
-    backgroundColor: "#E7EFE5",
-    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
     padding: 18,
-    marginBottom: 20,
+    marginBottom: 17,
+    borderWidth: 1,
+    borderColor: "#E5EAE2",
+  },
+  areaCabecalho: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  areaIdentificacao: {
+    color: "#81917F",
+    fontSize: 10,
+    fontWeight: "bold",
+    letterSpacing: 1,
+    marginBottom: 4,
   },
   areaName: {
     fontSize: 21,
     fontWeight: "bold",
     color: "#2F5D3A",
   },
-  quantidade: {
-    fontSize: 13,
-    color: "#526653",
-    marginTop: 5,
-    marginBottom: 15,
-  },
-  pontoCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 9,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  topoPonto: {
+  areaDireita: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  contador: {
+    backgroundColor: "#EDF4EB",
+    borderRadius: 10,
+    minWidth: 65,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     alignItems: "center",
   },
-  nomePonto: {
+  contadorNumero: {
+    color: "#2F5D3A",
     fontSize: 17,
     fontWeight: "bold",
-    color: "#2F5D3A",
   },
-  arrow: {
+  contadorTexto: {
+    color: "#687568",
+    fontSize: 10,
+  },
+  expandirSeta: {
     fontSize: 22,
+    color: "#6E9270",
+    width: 20,
+    textAlign: "center",
+  },
+  divisor: {
+    height: 1,
+    backgroundColor: "#EDF0EB",
+    marginVertical: 15,
+  },
+  pontoCard: {
+    backgroundColor: "#F8FAF7",
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#EDF0EB",
+  },
+  pontoIndicador: {
+    width: 4,
+    alignSelf: "stretch",
+    borderRadius: 4,
+    backgroundColor: "#A8C69F",
+    marginRight: 12,
+  },
+  pontoConteudo: {
+    flex: 1,
+  },
+  nomePonto: {
+    fontSize: 15,
+    fontWeight: "bold",
     color: "#2F5D3A",
   },
   identificacao: {
-    fontSize: 13,
-    color: "#777",
-    marginTop: 5,
+    fontSize: 11,
+    color: "#899289",
+    marginTop: 3,
   },
   ultimaLeitura: {
-    fontSize: 13,
-    color: "#526653",
-    marginTop: 12,
+    fontSize: 12,
+    color: "#687568",
+    marginTop: 9,
+  },
+  arrow: {
+    fontSize: 22,
+    color: "#6E9270",
+    marginLeft: 8,
+  },
+  estadoCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 25,
+    alignItems: "center",
   },
   vazio: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 10,
-    padding: 25,
+    borderRadius: 14,
+    padding: 28,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#E5EAE2",
+  },
+  vazioIcone: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#EDF4EB",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 13,
+  },
+  vazioIconeTexto: {
+    color: "#6E9270",
+    fontSize: 22,
   },
   vazioTitulo: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "bold",
     color: "#2F5D3A",
     marginBottom: 8,
+    textAlign: "center",
+  },
+  vazioMensagem: {
+    fontSize: 13,
+    color: "#788278",
+    textAlign: "center",
+    lineHeight: 21,
   },
   mensagem: {
     fontSize: 14,
-    color: "#666",
+    color: "#687568",
     textAlign: "center",
-    marginTop: 10,
     lineHeight: 21,
+  },
+  rodape: {
+    textAlign: "center",
+    color: "#9AA49A",
+    fontSize: 10,
+    letterSpacing: 1,
+    marginTop: 30,
   },
 });

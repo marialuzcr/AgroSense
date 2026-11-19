@@ -1,4 +1,5 @@
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -33,7 +34,6 @@ export default function AnalisesScreen() {
     carregarLeituras();
   }, []);
 
-  // Agrupa as medições de acordo com a área
   const areas = Object.values(
     leituras.reduce<
       Record<
@@ -71,7 +71,6 @@ export default function AnalisesScreen() {
     }, {}),
   );
 
-  // Calcula a média dos valores
   function calcularMedia(valores: number[]): string {
     if (valores.length === 0) return "0,0";
 
@@ -102,99 +101,125 @@ export default function AnalisesScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.conteudo}>
         <TouchableOpacity
           style={styles.botaoVoltar}
-          onPress={() => router.push("/dashboard")}
+          onPress={() => router.replace("/dashboard")}
         >
           <Text style={styles.seta}>←</Text>
           <Text style={styles.textoVoltar}>Dashboard</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Análises</Text>
+        <Text style={styles.miniTitulo}>AGROSENSE</Text>
+        <Text style={styles.titulo}>Análises</Text>
 
-        <Text style={styles.subtitle}>
-          Médias das medições das áreas monitoradas
+        <Text style={styles.subtitulo}>
+          Acompanhe as médias das medições e compare os resultados das áreas
+          monitoradas.
         </Text>
 
         {carregando ? (
-          <View style={styles.card}>
-            <Text style={styles.label}>Carregando medições...</Text>
+          <View style={styles.cardMensagem}>
+            <ActivityIndicator size="large" color="#2F5D3A" />
+            <Text style={styles.mensagem}>Carregando medições...</Text>
           </View>
         ) : leituras.length === 0 ? (
-          <View style={styles.card}>
-            <Text style={styles.areaNome}>Nenhuma medição encontrada</Text>
-            <Text style={styles.label}>
+          <View style={styles.cardMensagem}>
+            <Text style={styles.tituloCard}>Nenhuma medição encontrada</Text>
+            <Text style={styles.mensagem}>
               Quando houver medições salvas no Firestore, as análises aparecerão
               aqui.
             </Text>
           </View>
         ) : (
           <>
-            <Text style={styles.sectionTitle}>Média geral das áreas</Text>
+            <View style={styles.resumoCard}>
+              <Text style={styles.rotuloClaro}>MEDIÇÕES ANALISADAS</Text>
+              <Text style={styles.totalLeituras}>{leituras.length}</Text>
+              <Text style={styles.textoResumo}>
+                registros considerados nas médias
+              </Text>
+            </View>
+
+            <View style={styles.cabecalhoSecao}>
+              <Text style={styles.tituloSecao}>Média geral</Text>
+              <Text style={styles.subtituloSecao}>
+                Resultado conjunto de todas as áreas
+              </Text>
+            </View>
 
             <View style={styles.card}>
-              <View style={styles.medicao}>
-                <Text style={styles.label}>Temperatura média</Text>
-                <Text style={styles.valor}>{mediaTemperatura} °C</Text>
-              </View>
+              <View style={styles.gradeDados}>
+                <View style={styles.dadoCard}>
+                  <Text style={styles.label}>Temperatura média</Text>
+                  <Text style={styles.valor}>{mediaTemperatura} °C</Text>
+                </View>
 
-              <View style={styles.medicao}>
-                <Text style={styles.label}>Umidade média</Text>
-                <Text style={styles.valor}>{mediaUmidade} %</Text>
-              </View>
+                <View style={styles.dadoCard}>
+                  <Text style={styles.label}>Umidade média</Text>
+                  <Text style={styles.valor}>{mediaUmidade} %</Text>
+                </View>
 
-              <View style={styles.medicao}>
-                <Text style={styles.label}>Nitrogênio médio</Text>
-                <Text style={styles.valor}>{mediaNitrogenio} mg/kg</Text>
-              </View>
+                <View style={styles.dadoCard}>
+                  <Text style={styles.label}>Nitrogênio médio</Text>
+                  <Text style={styles.valor}>{mediaNitrogenio} mg/kg</Text>
+                </View>
 
-              <View style={styles.medicao}>
-                <Text style={styles.label}>Fósforo médio</Text>
-                <Text style={styles.valor}>{mediaFosforo} mg/kg</Text>
-              </View>
+                <View style={styles.dadoCard}>
+                  <Text style={styles.label}>Fósforo médio</Text>
+                  <Text style={styles.valor}>{mediaFosforo} mg/kg</Text>
+                </View>
 
-              <View style={styles.medicao}>
-                <Text style={styles.label}>Potássio médio</Text>
-                <Text style={styles.valor}>{mediaPotassio} mg/kg</Text>
+                <View style={styles.dadoCard}>
+                  <Text style={styles.label}>Potássio médio</Text>
+                  <Text style={styles.valor}>{mediaPotassio} mg/kg</Text>
+                </View>
               </View>
             </View>
 
-            <Text style={styles.sectionTitle}>Comparação entre áreas</Text>
+            <View style={styles.cabecalhoSecao}>
+              <Text style={styles.tituloSecao}>Comparação entre áreas</Text>
+              <Text style={styles.subtituloSecao}>
+                Médias individuais de cada área monitorada
+              </Text>
+            </View>
 
             {areas.map((area) => (
-              <View key={area.nome} style={styles.areaCard}>
-                <Text style={styles.areaNome}>Área {area.nome}</Text>
+              <View key={area.nome} style={styles.cardArea}>
+                <View style={styles.topoArea}>
+                  <View style={styles.indicadorArea} />
+                  <Text style={styles.areaNome}>Área {area.nome}</Text>
+                </View>
 
-                <View style={styles.medicao}>
+                <View style={styles.linhaMedicao}>
                   <Text style={styles.label}>Temperatura</Text>
                   <Text style={styles.valor}>
                     {calcularMedia(area.temperatura)} °C
                   </Text>
                 </View>
 
-                <View style={styles.medicao}>
+                <View style={styles.linhaMedicao}>
                   <Text style={styles.label}>Umidade</Text>
                   <Text style={styles.valor}>
                     {calcularMedia(area.umidade)} %
                   </Text>
                 </View>
 
-                <View style={styles.medicao}>
+                <View style={styles.linhaMedicao}>
                   <Text style={styles.label}>Nitrogênio</Text>
                   <Text style={styles.valor}>
                     {calcularMedia(area.nitrogenio)} mg/kg
                   </Text>
                 </View>
 
-                <View style={styles.medicao}>
+                <View style={styles.linhaMedicao}>
                   <Text style={styles.label}>Fósforo</Text>
                   <Text style={styles.valor}>
                     {calcularMedia(area.fosforo)} mg/kg
                   </Text>
                 </View>
 
-                <View style={styles.medicao}>
+                <View style={[styles.linhaMedicao, styles.ultimaLinha]}>
                   <Text style={styles.label}>Potássio</Text>
                   <Text style={styles.valor}>
                     {calcularMedia(area.potassio)} mg/kg
@@ -204,6 +229,8 @@ export default function AnalisesScreen() {
             ))}
           </>
         )}
+
+        <Text style={styles.rodape}>AGROSENSE • MONITORAMENTO AGRÍCOLA</Text>
       </ScrollView>
     </View>
   );
@@ -212,100 +239,181 @@ export default function AnalisesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F7F2",
+    backgroundColor: "#F2F5EF",
   },
-
-  content: {
+  conteudo: {
     width: "90%",
-    maxWidth: 700,
+    maxWidth: 850,
     alignSelf: "center",
-    paddingVertical: 25,
+    paddingTop: 25,
     paddingBottom: 40,
   },
-
   botaoVoltar: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 25,
   },
-
   seta: {
-    fontSize: 28,
+    fontSize: 25,
     color: "#2F5D3A",
     marginRight: 8,
   },
-
   textoVoltar: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#2F5D3A",
     fontWeight: "600",
   },
-
-  title: {
-    fontSize: 28,
+  miniTitulo: {
+    fontSize: 11,
     fontWeight: "bold",
-    color: "#2F5D3A",
+    letterSpacing: 2,
+    color: "#779477",
     marginBottom: 8,
   },
-
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 20,
+  titulo: {
+    fontSize: 29,
+    fontWeight: "bold",
+    color: "#244D31",
   },
-
-  sectionTitle: {
+  subtitulo: {
+    fontSize: 14,
+    color: "#687568",
+    marginTop: 7,
+    marginBottom: 22,
+    lineHeight: 21,
+  },
+  resumoCard: {
+    backgroundColor: "#244D31",
+    borderRadius: 15,
+    padding: 22,
+    marginBottom: 25,
+  },
+  rotuloClaro: {
+    fontSize: 10,
+    fontWeight: "bold",
+    letterSpacing: 1,
+    color: "#D4E3D1",
+  },
+  totalLeituras: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginTop: 8,
+  },
+  textoResumo: {
+    fontSize: 12,
+    color: "#D4E3D1",
+    marginTop: 3,
+  },
+  cabecalhoSecao: {
+    marginBottom: 14,
+    marginTop: 3,
+  },
+  tituloSecao: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
-    marginBottom: 15,
+    color: "#244D31",
+  },
+  subtituloSecao: {
+    fontSize: 12,
+    color: "#788278",
     marginTop: 5,
   },
-
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 25,
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 22,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#E5EAE2",
   },
-
-  areaCard: {
+  gradeDados: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+  },
+  dadoCard: {
+    width: "48%",
+    flexGrow: 1,
+    backgroundColor: "#F0F5ED",
+    borderRadius: 9,
+    padding: 13,
+  },
+  label: {
+    fontSize: 12,
+    color: "#788278",
+    flexShrink: 1,
+    marginRight: 8,
+  },
+  valor: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#2F5D3A",
+  },
+  cardArea: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 10,
+    borderRadius: 14,
     padding: 20,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#E5EAE2",
   },
-
-  areaNome: {
-    fontSize: 19,
-    fontWeight: "bold",
-    color: "#2F5D3A",
+  topoArea: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
   },
-
-  medicao: {
+  indicadorArea: {
+    width: 4,
+    height: 25,
+    borderRadius: 4,
+    backgroundColor: "#A8C69F",
+    marginRight: 12,
+  },
+  areaNome: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#244D31",
+  },
+  linhaMedicao: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#EEEEEE",
+    borderBottomColor: "#EDF0EB",
   },
-
-  label: {
-    fontSize: 14,
-    color: "#555",
-    flexShrink: 1,
-    marginRight: 10,
+  ultimaLinha: {
+    borderBottomWidth: 0,
   },
-
-  valor: {
-    fontSize: 15,
+  cardMensagem: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 22,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E5EAE2",
+    alignItems: "center",
+  },
+  tituloCard: {
+    fontSize: 17,
     fontWeight: "bold",
-    color: "#333",
+    color: "#244D31",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  mensagem: {
+    fontSize: 14,
+    color: "#788278",
+    lineHeight: 22,
+    marginTop: 10,
+    textAlign: "center",
+  },
+  rodape: {
+    textAlign: "center",
+    color: "#9AA49A",
+    fontSize: 10,
+    letterSpacing: 1,
+    marginTop: 25,
   },
 });

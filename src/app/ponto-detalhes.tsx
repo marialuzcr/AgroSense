@@ -38,6 +38,9 @@ export default function PontoDetalhesScreen() {
   const [carregando, setCarregando] = useState(true);
   const [salvandoTipo, setSalvandoTipo] = useState(false);
   const [mensagemTipo, setMensagemTipo] = useState("");
+  const [leituraSelecionada, setLeituraSelecionada] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     async function carregarDados() {
@@ -52,7 +55,13 @@ export default function PontoDetalhesScreen() {
         if (encontrado) {
           const leiturasEncontradas =
             await buscarLeiturasPorPontoFirestore(pontoId);
-          setLeituras(leiturasEncontradas);
+
+          const leiturasOrdenadas = [...leiturasEncontradas].sort(
+            (a, b) =>
+              new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime(),
+          );
+
+          setLeituras(leiturasOrdenadas);
         } else {
           setLeituras([]);
         }
@@ -96,12 +105,10 @@ export default function PontoDetalhesScreen() {
         tipo: novoTipo,
       });
 
-      const pontoAtualizado: Ponto = {
+      setPonto({
         ...ponto,
         tipo: novoTipo,
-      };
-
-      setPonto(pontoAtualizado);
+      });
 
       setMensagemTipo(
         `Tipo alterado para ${novoTipo === "fixo" ? "Ponto fixo" : "Ponto móvel"}.`,
@@ -124,225 +131,362 @@ export default function PontoDetalhesScreen() {
     return dataFormatada.toLocaleString("pt-BR");
   }
 
-  const ultimaLeitura = [...leituras].sort(
-    (a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime(),
-  )[0];
+  function alternarLeitura(id: string) {
+    setLeituraSelecionada((atual) => (atual === id ? null : id));
+  }
+
+  function renderDadosLeitura(leitura: Leitura) {
+    const dados = [
+      { nome: "Temperatura", valor: leitura.temperatura, unidade: "°C" },
+      { nome: "Umidade", valor: leitura.umidade, unidade: "%" },
+      {
+        nome: "Condutividade",
+        valor: leitura.condutividade,
+        unidade: "mS/cm",
+      },
+      { nome: "Potássio", valor: leitura.potassio, unidade: "" },
+      { nome: "Fósforo", valor: leitura.fosforo, unidade: "" },
+      { nome: "Nitrogênio", valor: leitura.nitrogenio, unidade: "" },
+      { nome: "pH", valor: leitura.ph, unidade: "" },
+    ];
+
+    return (
+      <View style={styles.dadosContainer}>
+        <Text style={styles.dadosTitulo}>Resultados desta medição</Text>
+
+        <View style={styles.gradeDados}>
+          {dados.map((dado) => (
+            <View key={dado.nome} style={styles.dadoCard}>
+              <Text style={styles.nomeDado}>{dado.nome}</Text>
+              <Text style={styles.valorDado}>
+                {dado.valor ?? "Não informado"}
+                {dado.valor != null && dado.unidade ? ` ${dado.unidade}` : ""}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  const ultimaLeitura = leituras[0];
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.conteudo}
-    >
-      <TouchableOpacity onPress={voltar}>
-        <Text style={styles.voltar}>← Voltar à área</Text>
-      </TouchableOpacity>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.conteudo}>
+        <TouchableOpacity style={styles.botaoVoltar} onPress={voltar}>
+          <Text style={styles.seta}>←</Text>
+          <Text style={styles.textoVoltar}>Voltar à área</Text>
+        </TouchableOpacity>
 
-      <Text style={styles.titulo}>Detalhes do ponto</Text>
+        <Text style={styles.miniTitulo}>AGROSENSE</Text>
+        <Text style={styles.titulo}>Detalhes do ponto</Text>
+        <Text style={styles.subtitulo}>
+          Consulte as informações do ponto e acompanhe seu histórico de
+          medições.
+        </Text>
 
-      <Text style={styles.subtitulo}>
-        Informações do ponto e dados recebidos dos sensores.
-      </Text>
-
-      {carregando ? (
-        <View style={styles.card}>
-          <Text style={styles.mensagem}>
-            Carregando informações do ponto...
-          </Text>
-        </View>
-      ) : !ponto ? (
-        <View style={styles.card}>
-          <Text style={styles.tituloCard}>Ponto não encontrado</Text>
-          <Text style={styles.mensagem}>
-            Não foi possível localizar esse ponto. Volte à área e selecione
-            novamente.
-          </Text>
-        </View>
-      ) : (
-        <>
+        {carregando ? (
           <View style={styles.card}>
-            <Text style={styles.rotulo}>Ponto selecionado</Text>
-
-            <Text style={styles.nomePonto}>{ponto.nome}</Text>
-
-            <Text style={styles.informacao}>Área: {ponto.area}</Text>
-            <Text style={styles.informacao}>Identificação: {ponto.id}</Text>
-
-            <View style={styles.secaoTipo}>
-              <Text style={styles.rotulo}>Tipo de ponto</Text>
-
-              {!!mensagemTipo && (
-                <Text style={styles.ajudaTipo}>{mensagemTipo}</Text>
-              )}
-
-              <Text style={styles.tipoAtual}>
-                {ponto.tipo === "movel" ? "Ponto móvel" : "Ponto fixo"}
-              </Text>
-
-              <Text style={styles.ajudaTipo}>
-                {ponto.tipo === "movel"
-                  ? "O local pode mudar a cada coleta."
-                  : "Este ponto representa um local permanente."}
-              </Text>
-
-              <TouchableOpacity
-                style={[
-                  styles.botaoAlterar,
-                  salvandoTipo && styles.botaoDesabilitado,
-                ]}
-                onPress={() =>
-                  alterarTipo(ponto.tipo === "fixo" ? "movel" : "fixo")
-                }
-                disabled={salvandoTipo}
-              >
-                <Text style={styles.textoBotaoAlterar}>
-                  {salvandoTipo ? "Salvando..." : "Alterar tipo"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {!!ponto.descricao && (
-              <View style={styles.secaoDescricao}>
-                <Text style={styles.rotulo}>Descrição</Text>
-                <Text style={styles.descricao}>{ponto.descricao}</Text>
-              </View>
-            )}
-
-            <Text style={styles.dataCadastro}>
-              Cadastrado em:{" "}
-              {new Date(ponto.dataCadastro).toLocaleDateString("pt-BR")}
+            <Text style={styles.mensagem}>
+              Carregando informações do ponto...
             </Text>
           </View>
-
+        ) : !ponto ? (
           <View style={styles.card}>
-            <Text style={styles.tituloCard}>Dados das medições</Text>
+            <Text style={styles.tituloCard}>Ponto não encontrado</Text>
+            <Text style={styles.mensagem}>
+              Não foi possível localizar esse ponto. Volte à área e selecione
+              novamente.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.resumoCard}>
+              <View style={styles.resumoTopo}>
+                <View style={styles.indicadorResumo} />
+                <Text style={styles.rotuloClaro}>PONTO SELECIONADO</Text>
+              </View>
+
+              <Text style={styles.nomePontoClaro}>{ponto.nome}</Text>
+              <Text style={styles.identificacaoClaro}>{ponto.id}</Text>
+
+              <View style={styles.resumoRodape}>
+                <View>
+                  <Text style={styles.rotuloClaro}>ÁREA</Text>
+                  <Text style={styles.valorResumo}>{ponto.area}</Text>
+                </View>
+                <View>
+                  <Text style={styles.rotuloClaro}>MEDIÇÕES</Text>
+                  <Text style={styles.valorResumo}>{leituras.length}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.tituloCard}>Informações do ponto</Text>
+
+              {!!ponto.descricao && (
+                <Text style={styles.descricao}>{ponto.descricao}</Text>
+              )}
+
+              <View style={styles.secaoTipo}>
+                <Text style={styles.rotulo}>Tipo de ponto</Text>
+                <Text style={styles.tipoAtual}>
+                  {ponto.tipo === "movel" ? "Ponto móvel" : "Ponto fixo"}
+                </Text>
+                <Text style={styles.ajudaTipo}>
+                  {ponto.tipo === "movel"
+                    ? "O local pode mudar a cada coleta."
+                    : "Este ponto representa um local permanente."}
+                </Text>
+
+                {!!mensagemTipo && (
+                  <Text style={styles.mensagemTipo}>{mensagemTipo}</Text>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.botaoAlterar,
+                    salvandoTipo && styles.botaoDesabilitado,
+                  ]}
+                  onPress={() =>
+                    alterarTipo(ponto.tipo === "fixo" ? "movel" : "fixo")
+                  }
+                  disabled={salvandoTipo}
+                >
+                  <Text style={styles.textoBotaoAlterar}>
+                    {salvandoTipo ? "Salvando..." : "Alterar tipo"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.dataCadastro}>
+                Cadastrado em:{" "}
+                {new Date(ponto.dataCadastro).toLocaleDateString("pt-BR")}
+              </Text>
+            </View>
+
+            <View style={styles.cabecalhoHistorico}>
+              <View>
+                <Text style={styles.tituloHistorico}>
+                  Histórico de medições
+                </Text>
+                <Text style={styles.subtituloHistorico}>
+                  Selecione uma medição para consultar os resultados.
+                </Text>
+              </View>
+              <View style={styles.contador}>
+                <Text style={styles.contadorNumero}>{leituras.length}</Text>
+              </View>
+            </View>
 
             {leituras.length === 0 ? (
-              <Text style={styles.mensagem}>
-                Nenhuma medição foi recebida para este ponto ainda.
-              </Text>
+              <View style={styles.card}>
+                <Text style={styles.tituloCard}>
+                  Nenhuma medição disponível
+                </Text>
+                <Text style={styles.mensagem}>
+                  Este ponto ainda não recebeu medições.
+                </Text>
+              </View>
             ) : (
-              <>
-                <Text style={styles.rotulo}>Última medição recebida</Text>
+              leituras.map((leitura, indice) => {
+                const aberta = leituraSelecionada === leitura.id;
 
-                <Text style={styles.dataLeitura}>
-                  {formatarData(ultimaLeitura!.dataHora)}
-                </Text>
+                return (
+                  <View key={leitura.id} style={styles.leituraCard}>
+                    <TouchableOpacity
+                      style={styles.leituraCabecalho}
+                      activeOpacity={0.75}
+                      onPress={() => alternarLeitura(leitura.id)}
+                    >
+                      <View style={styles.leituraIndicador} />
 
-                <View style={styles.divisor} />
+                      <View style={styles.leituraIdentificacao}>
+                        <Text style={styles.leituraNumero}>
+                          Medição {leituras.length - indice}
+                        </Text>
+                        <Text style={styles.dataLeitura}>
+                          {formatarData(leitura.dataHora)}
+                        </Text>
+                      </View>
 
-                <Text style={styles.valor}>
-                  Temperatura: {ultimaLeitura!.temperatura ?? "Não informado"}{" "}
-                  °C
-                </Text>
-                <Text style={styles.valor}>
-                  Umidade: {ultimaLeitura!.umidade ?? "Não informado"} %
-                </Text>
-                <Text style={styles.valor}>
-                  Condutividade:{" "}
-                  {ultimaLeitura!.condutividade ?? "Não informado"} mS/cm
-                </Text>
-                <Text style={styles.valor}>
-                  Potássio: {ultimaLeitura!.potassio ?? "Não informado"}
-                </Text>
-                <Text style={styles.valor}>
-                  Fósforo: {ultimaLeitura!.fosforo ?? "Não informado"}
-                </Text>
-                <Text style={styles.valor}>
-                  Nitrogênio: {ultimaLeitura!.nitrogenio ?? "Não informado"}
-                </Text>
-                <Text style={styles.valor}>
-                  pH: {ultimaLeitura!.ph ?? "Não informado"}
-                </Text>
+                      <View
+                        style={[
+                          styles.botaoExpandir,
+                          aberta && styles.botaoExpandirAberto,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.setaLeitura,
+                            aberta && styles.setaLeituraAberta,
+                          ]}
+                        >
+                          {aberta ? "−" : "+"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
 
-                <View style={styles.divisor} />
-
-                <Text style={styles.totalLeituras}>
-                  Total de medições recebidas: {leituras.length}
-                </Text>
-              </>
+                    {aberta && renderDadosLeitura(leitura)}
+                  </View>
+                );
+              })
             )}
-          </View>
-        </>
-      )}
-    </ScrollView>
+          </>
+        )}
+
+        <Text style={styles.rodape}>AGROSENSE • MONITORAMENTO AGRÍCOLA</Text>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F4F6F8",
+    backgroundColor: "#F2F5EF",
   },
   conteudo: {
     width: "90%",
-    maxWidth: 750,
+    maxWidth: 850,
     alignSelf: "center",
-    paddingVertical: 25,
+    paddingTop: 25,
     paddingBottom: 40,
   },
-  voltar: {
-    color: "#287A50",
+  botaoVoltar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 25,
+  },
+  seta: {
+    fontSize: 25,
+    color: "#2F5D3A",
+    marginRight: 8,
+  },
+  textoVoltar: {
     fontSize: 15,
+    color: "#2F5D3A",
     fontWeight: "600",
-    marginBottom: 22,
+  },
+  miniTitulo: {
+    fontSize: 11,
+    fontWeight: "bold",
+    letterSpacing: 2,
+    color: "#779477",
+    marginBottom: 8,
   },
   titulo: {
-    fontSize: 28,
+    fontSize: 29,
     fontWeight: "bold",
-    color: "#1D2935",
+    color: "#244D31",
   },
   subtitulo: {
     fontSize: 14,
-    color: "#718096",
-    marginTop: 6,
+    color: "#687568",
+    marginTop: 7,
     marginBottom: 22,
     lineHeight: 21,
   },
+  resumoCard: {
+    backgroundColor: "#244D31",
+    borderRadius: 15,
+    padding: 22,
+    marginBottom: 20,
+  },
+  resumoTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  indicadorResumo: {
+    width: 4,
+    height: 12,
+    borderRadius: 4,
+    backgroundColor: "#A8C69F",
+    marginRight: 8,
+  },
+  rotuloClaro: {
+    fontSize: 10,
+    fontWeight: "bold",
+    letterSpacing: 1,
+    color: "#D4E3D1",
+  },
+  nomePontoClaro: {
+    fontSize: 25,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginTop: 13,
+  },
+  identificacaoClaro: {
+    fontSize: 13,
+    color: "#D4E3D1",
+    marginTop: 3,
+  },
+  resumoRodape: {
+    flexDirection: "row",
+    gap: 45,
+    borderTopWidth: 1,
+    borderTopColor: "#456B4E",
+    marginTop: 20,
+    paddingTop: 15,
+  },
+  valorResumo: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginTop: 5,
+  },
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 18,
-    marginBottom: 16,
+    borderRadius: 14,
+    padding: 20,
+    marginBottom: 18,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#E5EAE2",
+  },
+  tituloCard: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#244D31",
+    marginBottom: 14,
   },
   rotulo: {
-    fontSize: 13,
-    color: "#718096",
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#829082",
   },
-  nomePonto: {
-    fontSize: 21,
-    fontWeight: "bold",
-    color: "#1D2935",
-    marginTop: 5,
-    marginBottom: 12,
-  },
-  informacao: {
+  descricao: {
     fontSize: 14,
-    color: "#526170",
-    marginTop: 7,
+    color: "#687568",
+    lineHeight: 21,
+    marginBottom: 15,
   },
   secaoTipo: {
-    marginTop: 20,
-    padding: 14,
-    backgroundColor: "#F4F6F8",
-    borderRadius: 8,
+    padding: 16,
+    backgroundColor: "#F2F5EF",
+    borderRadius: 10,
   },
   tipoAtual: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#287A50",
-    marginTop: 7,
+    color: "#2F5D3A",
+    marginTop: 8,
   },
   ajudaTipo: {
-    fontSize: 13,
-    color: "#718096",
-    marginTop: 5,
+    fontSize: 12,
+    color: "#788278",
+    marginTop: 6,
     lineHeight: 19,
+  },
+  mensagemTipo: {
+    fontSize: 12,
+    color: "#2F5D3A",
+    marginTop: 8,
   },
   botaoAlterar: {
     alignSelf: "flex-start",
-    backgroundColor: "#287A50",
+    backgroundColor: "#2F5D3A",
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -350,55 +494,144 @@ const styles = StyleSheet.create({
   },
   textoBotaoAlterar: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
   },
   botaoDesabilitado: {
     opacity: 0.6,
   },
-  secaoDescricao: {
-    marginTop: 18,
-  },
-  descricao: {
-    fontSize: 14,
-    color: "#526170",
-    lineHeight: 21,
-    marginTop: 6,
-  },
   dataCadastro: {
     fontSize: 12,
-    color: "#718096",
-    marginTop: 20,
+    color: "#899289",
+    marginTop: 17,
   },
-  tituloCard: {
-    fontSize: 18,
+  cabecalhoHistorico: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+    marginBottom: 14,
+  },
+  tituloHistorico: {
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#1D2935",
-    marginBottom: 16,
+    color: "#244D31",
+  },
+  subtituloHistorico: {
+    fontSize: 12,
+    color: "#788278",
+    marginTop: 5,
+  },
+  contador: {
+    minWidth: 42,
+    height: 42,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: "#E5EEE2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  contadorNumero: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#2F5D3A",
+  },
+  leituraCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "#E5EAE2",
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  leituraCabecalho: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 17,
+  },
+  leituraIndicador: {
+    width: 4,
+    height: 43,
+    borderRadius: 4,
+    backgroundColor: "#A8C69F",
+    marginRight: 13,
+  },
+  leituraIdentificacao: {
+    flex: 1,
+  },
+  leituraNumero: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#2F5D3A",
+  },
+  dataLeitura: {
+    fontSize: 12,
+    color: "#788278",
+    marginTop: 5,
+  },
+  botaoExpandir: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: "#EDF3EA",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  botaoExpandirAberto: {
+    backgroundColor: "#2F5D3A",
+  },
+  setaLeitura: {
+    fontSize: 21,
+    color: "#2F5D3A",
+  },
+  setaLeituraAberta: {
+    color: "#FFFFFF",
+  },
+  dadosContainer: {
+    padding: 17,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: "#EDF0EB",
+    backgroundColor: "#FBFCFA",
+  },
+  dadosTitulo: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#244D31",
+    marginBottom: 13,
+  },
+  gradeDados: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+  },
+  dadoCard: {
+    width: "48%",
+    flexGrow: 1,
+    backgroundColor: "#F0F5ED",
+    borderRadius: 9,
+    padding: 12,
+  },
+  nomeDado: {
+    fontSize: 12,
+    color: "#788278",
+    marginBottom: 6,
+  },
+  valorDado: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2F5D3A",
   },
   mensagem: {
     fontSize: 14,
-    color: "#718096",
+    color: "#788278",
     lineHeight: 22,
   },
-  dataLeitura: {
-    fontSize: 14,
-    color: "#526170",
-    marginTop: 6,
-  },
-  divisor: {
-    height: 1,
-    backgroundColor: "#E0E0E0",
-    marginVertical: 15,
-  },
-  valor: {
-    fontSize: 15,
-    color: "#344054",
-    marginBottom: 13,
-  },
-  totalLeituras: {
-    fontSize: 13,
-    color: "#287A50",
-    fontWeight: "600",
+  rodape: {
+    textAlign: "center",
+    color: "#9AA49A",
+    fontSize: 10,
+    letterSpacing: 1,
+    marginTop: 25,
   },
 });
