@@ -10,7 +10,7 @@ import {
 } from "react-native";
 
 import { router, useFocusEffect } from "expo-router";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../backend/services/firebase";
 import { buscarLeiturasFirestore } from "../../backend/services/firebase/leituras-service";
@@ -159,7 +159,14 @@ export default function DashboardScreen() {
 
           <TouchableOpacity
             style={styles.logout}
-            onPress={() => router.replace("/")}
+            onPress={async () => {
+              try {
+                await signOut(auth);
+                router.replace("/login");
+              } catch (erro) {
+                console.error("Erro ao sair da conta:", erro);
+              }
+            }}
           >
             <Text style={styles.menuText}>Sair da conta</Text>
           </TouchableOpacity>
@@ -285,7 +292,14 @@ export default function DashboardScreen() {
               ))}
               <TouchableOpacity
                 style={styles.mobileMenuItem}
-                onPress={() => router.replace("/")}
+                onPress={async () => {
+                  try {
+                    await signOut(auth);
+                    router.replace("/login");
+                  } catch (erro) {
+                    console.error("Erro ao sair da conta:", erro);
+                  }
+                }}
               >
                 <Text style={styles.mobileMenuText}>Sair da conta</Text>
               </TouchableOpacity>
@@ -319,7 +333,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingBottom: 10,
   },
-
   logo: {
     width: 54,
     height: 54,

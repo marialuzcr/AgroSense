@@ -128,27 +128,6 @@ export default function MedicoesScreen() {
               <View
                 style={[
                   styles.etiquetaEquipamento,
-                  verificandoSessao || erroSessao
-                    ? styles.etiquetaVerificando
-                    : sessaoAtiva
-                      ? styles.etiquetaOcupado
-                      : styles.etiquetaDisponivel,
-                ]}
-              >
-                <Text style={styles.textoEtiqueta}>
-                  {verificandoSessao
-                    ? "Verificando sessão..."
-                    : erroSessao
-                      ? "Sessão indisponível"
-                      : sessaoAtiva
-                        ? "Equipamento ativo"
-                        : "Equipamento disponível"}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.etiquetaEquipamento,
                   verificandoEquipamento ||
                   erroEquipamento ||
                   !estadoEquipamento

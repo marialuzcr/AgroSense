@@ -1,3 +1,4 @@
+
 import {
     onValue,
     push,
@@ -14,7 +15,7 @@ export type SessaoMedicao = {
     pontoId: string;
     pontoNome: string;
     area: string;
-    status: "ativa" | "concluida";
+    status: "ativa" | "concluida" | "Disponivel";
     dataHoraInicio: string;
     dataHoraFim?: string;
 };
@@ -63,14 +64,17 @@ export async function iniciarSessao(
         "controle/sessaoAtiva",
     );
 
-    // Tenta reservar o equipamento globalmente
+    // Reserva o equipamento globalmente.
     const resultado = await runTransaction(
         referenciaControle,
         (sessaoAtual) => {
-            if (sessaoAtual !== null) {
+            // Bloqueia somente se já existir uma medição ativa.
+            if (sessaoAtual?.status === "ativa") {
                 return;
             }
 
+            // Permite iniciar se estiver Disponivel,
+            // concluída ou sem registro.
             return sessao;
         },
     );
@@ -89,7 +93,7 @@ export async function iniciarSessao(
 
         return sessao;
     } catch (erro) {
-        // Libera o controle caso não consiga registrar no perfil
+        // Libera o controle caso não consiga registrar no perfil.
         await runTransaction(referenciaControle, (sessaoAtual) => {
             if (sessaoAtual?.sessaoId === sessaoId) {
                 return null;
@@ -102,18 +106,13 @@ export async function iniciarSessao(
     }
 }
 
-
+// Conclui uma sessão de medição
 export async function concluirSessao(sessaoId: string): Promise<void> {
     const usuario = auth.currentUser;
 
     if (!usuario) {
         throw new Error("Nenhum produtor está conectado.");
     }
-
-    const referenciaSessao = ref(
-        realtimeDb,
-        `usuarios/${usuario.uid}/sessoes/${sessaoId}`,
-    );
 
     const referenciaControle = ref(
         realtimeDb,
@@ -123,8 +122,10 @@ export async function concluirSessao(sessaoId: string): Promise<void> {
     const resultado = await runTransaction(
         referenciaControle,
         (sessaoAtual) => {
-            if (sessaoAtual?.sessaoId === sessaoId &&
-                sessaoAtual?.uid === usuario.uid) {
+            if (
+                sessaoAtual?.sessaoId === sessaoId &&
+                sessaoAtual?.uid === usuario.uid
+            ) {
                 return null;
             }
 
@@ -136,15 +137,21 @@ export async function concluirSessao(sessaoId: string): Promise<void> {
         throw new Error("Não foi possível liberar o equipamento.");
     }
 
-    await set(ref(
-        realtimeDb,
-        `usuarios/${usuario.uid}/sessoes/${sessaoId}/status`,
-    ), "concluida");
+    await set(
+        ref(
+            realtimeDb,
+            `usuarios/${usuario.uid}/sessoes/${sessaoId}/status`,
+        ),
+        "concluida",
+    );
 
-    await set(ref(
-        realtimeDb,
-        `usuarios/${usuario.uid}/sessoes/${sessaoId}/dataHoraFim`,
-    ), new Date().toISOString());
+    await set(
+        ref(
+            realtimeDb,
+            `usuarios/${usuario.uid}/sessoes/${sessaoId}/dataHoraFim`,
+        ),
+        new Date().toISOString(),
+    );
 }
 
 // Observa em tempo real o estado do equipamento
@@ -161,6 +168,12 @@ export function observarSessaoAtiva(
         referenciaControle,
         (snapshot) => {
             const dados = snapshot.val() as SessaoMedicao | null;
+
+            if (!dados || dados.status !== "ativa") {
+                aoAtualizar(null);
+                return;
+            }
+
             aoAtualizar(dados);
         },
         (erro) => {
@@ -170,6 +183,7 @@ export function observarSessaoAtiva(
     );
 }
 
+// Estado de conexão do equipamento
 export type EstadoEquipamento = {
     conectado: boolean;
     ultimaComunicacao: number;
@@ -195,6 +209,11 @@ export function observarEquipamento(
                     conectado: dados.conectado === true,
                     ultimaComunicacao: dados.ultimaComunicacao ?? 0,
                 });
+            } else {
+                aoAtualizar({
+                    conectado: false,
+                    ultimaComunicacao: 0,
+                });
             }
         },
         (erro) => {
@@ -203,3 +222,4 @@ export function observarEquipamento(
         },
     );
 }
+

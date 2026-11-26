@@ -8,9 +8,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { observarLeituras } from "../../backend/services/firebase/leituras-service";
-import { iniciarSessao } from "../../backend/services/firebase/sessoes-service";
+import {
+  iniciarSessao,
+  observarEquipamento,
+  observarSessaoAtiva,
+} from "../../backend/services/firebase/sessoes-service";
+
 import type { Leitura } from "../data/leituras";
+
+import type {
+  EstadoEquipamento,
+  SessaoMedicao,
+} from "../../backend/services/firebase/sessoes-service";
 
 export default function MedicaoDetalhesScreen() {
   const params = useLocalSearchParams();
@@ -27,26 +38,80 @@ export default function MedicaoDetalhesScreen() {
     : params.descricao;
   const tipo = Array.isArray(params.tipo) ? params.tipo[0] : params.tipo;
 
-  console.log("Tipo recebido na medição:", tipo);
-
   const [medicaoIniciada, setMedicaoIniciada] = useState(false);
-
   const [leituras, setLeituras] = useState<Leitura[]>([]);
+  const leituraAtual = leituras[0];
+
   const [erroLeitura, setErroLeitura] = useState("");
+  const [erroMedicao, setErroMedicao] = useState("");
+
+  const [equipamentoConectado, setEquipamentoConectado] = useState<
+    boolean | null
+  >(null);
+
+  const [sessaoAtiva, setSessaoAtiva] = useState<SessaoMedicao | null>(null);
+
+  const equipamentoOcupado =
+    sessaoAtiva !== null && sessaoAtiva.pontoId !== pontoId;
 
   function voltar() {
     router.back();
   }
 
+  // Observa a conexão do equipamento e a sessão global.
+  useEffect(() => {
+    const cancelarEquipamento = observarEquipamento(
+      (estado: EstadoEquipamento) => {
+        setEquipamentoConectado(estado.conectado);
+      },
+      (erro) => {
+        console.error("Erro ao verificar equipamento:", erro);
+        setEquipamentoConectado(false);
+      },
+    );
+
+    const cancelarSessao = observarSessaoAtiva(
+      (sessao) => {
+        setSessaoAtiva(sessao);
+
+        if (sessao?.pontoId === pontoId) {
+          setMedicaoIniciada(true);
+          setErroMedicao("");
+        } else if (!sessao) {
+          setMedicaoIniciada(false);
+        }
+      },
+      (erro) => {
+        console.error("Erro ao verificar sessão:", erro);
+      },
+    );
+
+    return () => {
+      cancelarEquipamento();
+      cancelarSessao();
+    };
+  }, [pontoId]);
+
   async function iniciarMedicao() {
-    if (medicaoIniciada) return;
+    if (medicaoIniciada || equipamentoOcupado) return;
+
+    setErroMedicao("");
+
+    if (equipamentoConectado !== true) {
+      setErroMedicao(
+        equipamentoConectado === false
+          ? "Aparelho desconectado. Tente conectar para fazer uma medição."
+          : "Verificando conexão com o aparelho. Aguarde um momento.",
+      );
+      return;
+    }
+
+    if (!pontoId || !area) {
+      Alert.alert("Atenção", "Ponto ou área não identificados.");
+      return;
+    }
 
     try {
-      if (!pontoId || !area) {
-        Alert.alert("Atenção", "Ponto ou área não identificados.");
-        return;
-      }
-
       await iniciarSessao(pontoId, pontoNome || "Ponto", area);
 
       setMedicaoIniciada(true);
@@ -58,17 +123,30 @@ export default function MedicaoDetalhesScreen() {
     } catch (erro) {
       console.error("Erro ao iniciar medição:", erro);
 
-      Alert.alert(
-        "Não foi possível iniciar",
-        erro instanceof Error
-          ? erro.message
-          : "Verifique a conexão e tente novamente.",
-      );
+      const mensagemErro = erro instanceof Error ? erro.message : "";
+
+      if (
+        mensagemErro.includes(
+          "O equipamento já está sendo utilizado em outra medição",
+        )
+      ) {
+        setErroMedicao(
+          "Já existe uma medição em andamento em outro ponto. Aguarde a conclusão da coleta atual para iniciar uma nova medição.",
+        );
+      } else {
+        setErroMedicao(
+          "Ocorreu um problema ao solicitar a medição. Verifique sua conexão e tente novamente.",
+        );
+      }
     }
   }
 
+  // Recebe as leituras somente quando a medição deste ponto está ativa.
   useEffect(() => {
-    if (!medicaoIniciada || !pontoId) return;
+    if (!medicaoIniciada || !pontoId) {
+      setLeituras([]);
+      return;
+    }
 
     const cancelar = observarLeituras(
       (dados) => {
@@ -87,6 +165,28 @@ export default function MedicaoDetalhesScreen() {
 
     return cancelar;
   }, [medicaoIniciada, pontoId]);
+
+  const tituloStatus =
+    equipamentoConectado === null
+      ? "Verificando aparelho..."
+      : !equipamentoConectado
+        ? "Aparelho desconectado"
+        : equipamentoOcupado
+          ? "Equipamento em uso em outro ponto"
+          : medicaoIniciada
+            ? "Aguardando dados dos sensores"
+            : "Disponível para medição";
+
+  const mensagemStatus =
+    equipamentoConectado === null
+      ? "Aguarde enquanto verificamos a conexão com o aparelho."
+      : !equipamentoConectado
+        ? "Tente conectar o aparelho para fazer uma medição."
+        : equipamentoOcupado
+          ? `O equipamento está realizando uma medição no ponto ${sessaoAtiva?.pontoNome || sessaoAtiva?.pontoId}. Aguarde a conclusão.`
+          : medicaoIniciada
+            ? "A solicitação foi preparada. Os dados aparecerão aqui quando forem recebidos do ESP32."
+            : "O aparelho está conectado e disponível. Você pode iniciar uma medição.";
 
   return (
     <View style={styles.container}>
@@ -154,66 +254,148 @@ export default function MedicaoDetalhesScreen() {
             <View
               style={[
                 styles.indicadorStatus,
-                medicaoIniciada && styles.indicadorAtivo,
+                equipamentoConectado === true && styles.indicadorAtivo,
+                (!equipamentoConectado || equipamentoOcupado) &&
+                  styles.indicadorErro,
               ]}
             />
 
-            <Text style={styles.status}>
-              {medicaoIniciada
-                ? "Aguardando dados dos sensores"
-                : "Aguardando início"}
-            </Text>
+            <Text style={styles.status}>{tituloStatus}</Text>
           </View>
 
-          <Text style={styles.mensagem}>
-            {medicaoIniciada
-              ? "A solicitação foi preparada. Os dados aparecerão aqui quando forem recebidos do ESP32."
-              : "Inicie uma medição para preparar a solicitação de coleta dos sensores."}
-          </Text>
+          <Text style={styles.mensagem}>{mensagemStatus}</Text>
 
           <TouchableOpacity
             style={[
               styles.botaoIniciar,
-              medicaoIniciada && styles.botaoDesabilitado,
+              (medicaoIniciada ||
+                equipamentoConectado !== true ||
+                equipamentoOcupado) &&
+                styles.botaoDesabilitado,
             ]}
             onPress={iniciarMedicao}
-            disabled={medicaoIniciada}
+            disabled={
+              medicaoIniciada ||
+              equipamentoConectado !== true ||
+              equipamentoOcupado
+            }
           >
             <Text style={styles.textoBotao}>
-              {medicaoIniciada ? "Aguardando sensores" : "Iniciar medição"}
+              {medicaoIniciada
+                ? "Medição em andamento"
+                : equipamentoConectado === null
+                  ? "Verificando aparelho..."
+                  : !equipamentoConectado
+                    ? "Aparelho desconectado"
+                    : equipamentoOcupado
+                      ? "Equipamento em uso"
+                      : "Iniciar medição"}
             </Text>
           </TouchableOpacity>
+
+          {(!equipamentoConectado || erroMedicao !== "") &&
+            equipamentoConectado !== null && (
+              <View style={styles.caixaErro}>
+                <Text style={styles.tituloErro}>
+                  {!equipamentoConectado
+                    ? "Aparelho desconectado"
+                    : erroMedicao.includes("Já existe uma medição")
+                      ? "Equipamento ocupado"
+                      : "Não foi possível iniciar"}
+                </Text>
+
+                <Text style={styles.textoErro}>
+                  {!equipamentoConectado
+                    ? "Tente conectar o aparelho para fazer uma medição."
+                    : erroMedicao}
+                </Text>
+              </View>
+            )}
+
+          {erroMedicao !== "" && equipamentoConectado === null && (
+            <View style={styles.caixaErro}>
+              <Text style={styles.tituloErro}>Atenção</Text>
+              <Text style={styles.textoErro}>{erroMedicao}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.card}>
           <View style={styles.cabecalhoSensores}>
             <Text style={styles.tituloSecao}>Dados dos sensores</Text>
+
             <View style={styles.etiquetaPendente}>
-              <Text style={styles.textoPendente}>Pendente</Text>
+              <Text style={styles.textoPendente}>
+                {leituraAtual ? "Dados recebidos" : "Pendente"}
+              </Text>
             </View>
           </View>
 
-          <Text style={styles.mensagem}>
-            Os valores serão apresentados nesta seção quando forem recebidos dos
-            sensores.
-          </Text>
+          {erroLeitura ? (
+            <Text style={styles.mensagem}>{erroLeitura}</Text>
+          ) : !medicaoIniciada ? (
+            <Text style={styles.mensagem}>
+              Inicie uma medição para receber os dados dos sensores.
+            </Text>
+          ) : !leituraAtual ? (
+            <Text style={styles.mensagem}>
+              Aguardando os dados dos sensores...
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.mensagem}>
+                Última leitura recebida:{" "}
+                {new Date(leituraAtual.dataHora).toLocaleString("pt-BR")}
+              </Text>
 
-          <View style={styles.listaSensores}>
-            {[
-              "Temperatura",
-              "Umidade",
-              "Condutividade",
-              "Potássio",
-              "Fósforo",
-              "Nitrogênio",
-              "pH do solo",
-            ].map((sensor) => (
-              <View key={sensor} style={styles.itemSensor}>
-                <Text style={styles.nomeSensor}>{sensor}</Text>
-                <Text style={styles.valorPendente}>—</Text>
+              <View style={styles.listaSensores}>
+                {[
+                  {
+                    nome: "Temperatura",
+                    valor: leituraAtual.temperatura,
+                    unidade: "°C",
+                  },
+                  {
+                    nome: "Umidade",
+                    valor: leituraAtual.umidade,
+                    unidade: "%",
+                  },
+                  {
+                    nome: "Condutividade",
+                    valor: leituraAtual.condutividade,
+                    unidade: "",
+                  },
+                  {
+                    nome: "Potássio",
+                    valor: leituraAtual.potassio,
+                    unidade: "",
+                  },
+                  {
+                    nome: "Fósforo",
+                    valor: leituraAtual.fosforo,
+                    unidade: "",
+                  },
+                  {
+                    nome: "Nitrogênio",
+                    valor: leituraAtual.nitrogenio,
+                    unidade: "",
+                  },
+                  {
+                    nome: "pH do solo",
+                    valor: leituraAtual.ph,
+                    unidade: "",
+                  },
+                ].map((sensor) => (
+                  <View key={sensor.nome} style={styles.itemSensor}>
+                    <Text style={styles.nomeSensor}>{sensor.nome}</Text>
+                    <Text style={styles.valorPendente}>
+                      {sensor.valor} {sensor.unidade}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            </>
+          )}
         </View>
 
         <Text style={styles.rodape}>AGROSENSE • MONITORAMENTO AGRÍCOLA</Text>
@@ -350,6 +532,9 @@ const styles = StyleSheet.create({
   indicadorAtivo: {
     backgroundColor: "#2F5D3A",
   },
+  indicadorErro: {
+    backgroundColor: "#C63D35",
+  },
   status: {
     fontSize: 14,
     fontWeight: "600",
@@ -375,6 +560,25 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "bold",
+  },
+  caixaErro: {
+    backgroundColor: "#FCE8E6",
+    borderWidth: 1,
+    borderColor: "#E7B5B5",
+    borderRadius: 9,
+    padding: 14,
+    marginTop: 15,
+  },
+  tituloErro: {
+    color: "#B42318",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  textoErro: {
+    color: "#8F3028",
+    fontSize: 13,
+    lineHeight: 20,
   },
   cabecalhoSensores: {
     flexDirection: "row",
